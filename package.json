@@ -5,6 +5,7 @@
   "type": "module",
   "description": "Movie and series soundtrack finder built with Next.js",
   "scripts": {
+    "postinstall": "prisma generate",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
