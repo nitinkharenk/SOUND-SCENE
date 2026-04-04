@@ -85,12 +85,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: new Date(),
       priority: 0.7,
     })),
-    ...genres.map((genre) => ({
+    ...genres.map((genre: string) => ({
       url: `${siteUrl}/discover/${genre}`,
       lastModified: new Date(),
       priority: 0.7,
     })),
-    ...scenes.map((scene) => ({
+    ...scenes.map((scene: string) => ({
       url: `${siteUrl}/scenes/${scene}`,
       lastModified: new Date(),
       priority: 0.7,
