@@ -29,6 +29,19 @@ function getConnectionString() {
 }
 
 function getPgConfig() {
+  // In production, always use the pooler connection string (port 6543).
+  // Direct host:5432 connections are blocked by Vercel (IPv6 unreachable).
+  const poolerUrl = getConnectionString();
+  if (poolerUrl && process.env.NODE_ENV === "production") {
+    return {
+      connectionString: poolerUrl,
+      max: 2,
+      ssl: {
+        rejectUnauthorized: false,
+      },
+    };
+  }
+
   const host = process.env.POSTGRES_HOST;
   const user = process.env.POSTGRES_USER;
   const password = process.env.POSTGRES_PASSWORD;
@@ -36,7 +49,7 @@ function getPgConfig() {
 
   if (!host || !user || !password || !database) {
     return {
-      connectionString: getConnectionString(),
+      connectionString: poolerUrl,
       max: process.env.NODE_ENV === "development" ? 5 : 2,
       ssl: {
         rejectUnauthorized: false,
@@ -50,7 +63,7 @@ function getPgConfig() {
     password,
     database,
     port: 5432,
-    max: process.env.NODE_ENV === "development" ? 5 : 2,
+    max: 5,
     ssl: {
       rejectUnauthorized: false,
     },
