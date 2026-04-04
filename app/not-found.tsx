@@ -13,27 +13,27 @@ export default function NotFound() {
         <div className="w-full max-w-2xl rounded-[1rem] border border-[color:var(--line)] bg-[color:var(--background)] p-6 shadow-[0_26px_80px_rgba(0,0,0,0.12)] sm:p-8">
           <div className="route-kicker">404 error</div>
           <div className="mt-4">
-            <h1 className="font-heading flex flex-wrap items-end gap-x-4 gap-y-1 text-4xl font-bold uppercase leading-[0.95] tracking-tight sm:text-5xl">
-              <span className="whitespace-nowrap text-[color:var(--foreground)]">Page</span>
+            <h1 className="font-heading flex flex-wrap items-end gap-x-4 gap-y-1 text-4xl font-extrabold uppercase leading-[1.25] tracking-[0.01em] sm:text-5xl">
+              <span className="whitespace-nowrap text-[color:var(--foreground)]">Track</span>
               <span
                 className="section-outline-word whitespace-nowrap"
                 style={{
-                  WebkitTextStroke: "2.3px var(--outlined-stroke)",
+                  WebkitTextStroke: "1.8px var(--outlined-stroke)",
                   WebkitTextFillColor: "transparent",
                 }}
               >
-                Missing
+                Not Found
               </span>
             </h1>
             <p className="mt-5 max-w-xl font-body text-base font-normal leading-relaxed text-[color:var(--muted)]">
-              The page you tried to open doesn&apos;t exist, may have moved, or the link is broken.
-              You can jump back into the catalog from here.
+              The soundtrack you&apos;re looking for might have moved, been removed, or never made
+              it into our catalog. You can jump back into SoundScene from here.
             </p>
           </div>
 
           <div className="mt-8 grid gap-3 sm:grid-cols-2">
-            <Link href="/" className="route-action route-action-primary focus-ring">
-              Go Home
+            <Link href="/search" className="route-action route-action-primary focus-ring">
+              Search SoundScene
             </Link>
             <NotFoundBackButton />
           </div>

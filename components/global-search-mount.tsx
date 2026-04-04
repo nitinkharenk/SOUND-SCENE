@@ -6,9 +6,9 @@ import SearchBar from "@/components/SearchBar";
 export function GlobalSearchMount() {
   const pathname = usePathname();
 
-  if (pathname === "/") {
+  if (pathname === "/" || pathname === "/search") {
     return null;
   }
 
-  return <SearchBar inline={false} />;
+  return <SearchBar mode="redirect" />;
 }

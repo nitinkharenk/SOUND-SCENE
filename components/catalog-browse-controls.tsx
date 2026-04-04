@@ -68,6 +68,8 @@ export function CatalogBrowseControls({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const searchKey = searchParams.toString();
+  const fieldIdBase = activeLabel.toLowerCase().replace(/\s+/g, "-");
 
   const queryParam = searchParams.get("q") ?? "";
   const sortParam = searchParams.get("sort") ?? defaultSort;
@@ -81,7 +83,7 @@ export function CatalogBrowseControls({
     setQuery(queryParam);
     setSort(sortParam);
     setSelectedFilters(filterParams);
-  }, [queryParam, sortParam, ...filters.map((filter) => filterParams[filter.param] ?? "")]);
+  }, [searchKey, queryParam, sortParam, filters]);
 
   const replaceFilters = (next: BrowseState) => {
     const href = buildBrowseHref(pathname, next, { defaultSort });
@@ -136,7 +138,7 @@ export function CatalogBrowseControls({
           });
         }}
       >
-        <label htmlFor={`${activeLabel.toLowerCase()}-catalog-search`} className="sr-only">
+        <label htmlFor={`${fieldIdBase}-catalog-search`} className="sr-only">
           {searchLabel}
         </label>
 
@@ -144,7 +146,7 @@ export function CatalogBrowseControls({
           <div className="flex items-center gap-3">
             <SearchIcon className="h-[1.05rem] w-[1.05rem] text-accent" />
             <input
-              id={`${activeLabel.toLowerCase()}-catalog-search`}
+              id={`${fieldIdBase}-catalog-search`}
               name="q"
               value={query}
               onChange={(event) => setQuery(event.target.value)}

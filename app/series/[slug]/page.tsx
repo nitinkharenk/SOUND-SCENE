@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { SoundtrackList } from "@/components/soundtrack-list";
+import { SeriesSceneMap } from "@/components/series-scene-map";
+import { TimestampLookup } from "@/components/timestamp-lookup";
 import { RouteMeta, RouteTagList, SplitHeading } from "@/components/route-heading";
-import { getContentBySlug, getStaticSeriesParams } from "@/lib/catalog";
+import { getSeriesBySlug, getStaticSeriesParams } from "@/lib/content-store";
+import { hasParseableTimestamp, pluralize } from "@/lib/text";
 
 type SeriesDetailPageProps = {
   params: Promise<{
@@ -10,75 +12,15 @@ type SeriesDetailPageProps = {
   }>;
 };
 
-export function generateStaticParams() {
+export async function generateStaticParams() {
   return getStaticSeriesParams();
-}
-
-function EpisodeCard({
-  seasonNumber,
-  episodeNumber,
-  title,
-  summary,
-  songs,
-}: {
-  seasonNumber: number;
-  episodeNumber: number;
-  title: string;
-  summary: string;
-  songs: Array<{
-    order: number;
-    timestamp: string;
-    sceneDescription: string;
-    song: {
-      slug: string;
-      title: string;
-      artist: string;
-      mood: string;
-      youtubeLink: string;
-      spotifyLink: string;
-    };
-  }>;
-}) {
-  return (
-    <section className="route-divider pt-6 first:border-t-0 first:pt-0">
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="route-kicker">
-            Season {seasonNumber} · Episode {episodeNumber}
-          </p>
-          <h4 className="card-heading mt-2 text-[1.7rem] font-semibold leading-[1.04] text-black">
-            {title}
-          </h4>
-        </div>
-        <div className="route-tag-list">
-          <span className="route-tag">{songs.length} cues</span>
-          <span className="route-tag">{songs[0]?.song.title ?? "Soundtrack update"}</span>
-        </div>
-      </div>
-
-      <p className="mb-6 max-w-3xl font-body text-base font-normal leading-relaxed text-black/62">
-        {summary}
-      </p>
-
-      <SoundtrackList
-        items={songs.map((song) => ({
-          ...song,
-          seasonNumber,
-          episodeNumber,
-          episodeTitle: title,
-        }))}
-        showEpisode
-        variant="bulletin"
-      />
-    </section>
-  );
 }
 
 export default async function SeriesDetailPage({
   params,
 }: SeriesDetailPageProps) {
   const { slug } = await params;
-  const series = getContentBySlug("series", slug);
+  const series = await getSeriesBySlug(slug);
 
   if (!series) {
     notFound();
@@ -99,6 +41,8 @@ export default async function SeriesDetailPage({
     (count, season) => count + season.episodes.length,
     0,
   );
+  const totalCues = flattenedSongs.length;
+  const hasTimestampLookup = flattenedSongs.some((item) => hasParseableTimestamp(item.timestamp));
 
   return (
     <div className="route-shell">
@@ -108,19 +52,26 @@ export default async function SeriesDetailPage({
             kicker="Series soundtrack guide"
             leadTitle={series.title}
             outlineTitle="Episodes"
+            mode="detail"
             description={series.description}
           />
           <RouteMeta
             items={[
               series.year,
-              `${series.seasonsCount} seasons`,
-              `${totalEpisodes} episodes`,
+              pluralize(series.seasonsCount, "season"),
+              pluralize(totalEpisodes, "episode"),
               series.platform,
               `Rating ${series.rating}`,
             ]}
           />
           <div className="mt-6">
-            <RouteTagList items={series.genres} tone="accent" />
+            <RouteTagList
+              items={series.genres.map((genre) => ({
+                label: genre,
+                href: `/series?genre=${encodeURIComponent(genre)}`,
+              }))}
+              tone="accent"
+            />
           </div>
           <div className="mt-7 flex flex-wrap gap-3">
             <Link href="/series" className="route-action focus-ring">
@@ -152,89 +103,23 @@ export default async function SeriesDetailPage({
             <div className="rounded-[0.7rem] border border-black/8 bg-accent-subtle px-4 py-4">
               <p className="route-kicker">Song Cues</p>
               <p className="mt-2 font-card text-3xl font-semibold text-black">
-                {flattenedSongs.length}
+                {totalCues}
               </p>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="mt-14 grid gap-12 xl:grid-cols-[1.24fr_0.76fr]">
-        <div>
-          <div className="mb-7">
-            <SplitHeading
-              kicker="Episode-level breakdown"
-              leadTitle="Season"
-              outlineTitle="Map"
-              compact
-            />
-          </div>
-
-          <div className="space-y-12">
-            {series.seasons.map((season) => (
-              <section key={season.seasonNumber}>
-                <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-                  <div>
-                    <p className="route-kicker">Season {season.seasonNumber}</p>
-                    <h3 className="card-heading mt-2 text-3xl font-semibold leading-tight text-black">
-                      {season.episodes.length} mapped episodes
-                    </h3>
-                  </div>
-                  <p className="font-body text-sm font-normal text-black/54">
-                    {season.episodes.reduce((count, episode) => count + episode.songs.length, 0)} total cues
-                  </p>
-                </div>
-
-                <div className="grid gap-8 xl:grid-cols-2">
-                  {season.episodes.map((episode) => (
-                    <EpisodeCard
-                      key={`${season.seasonNumber}-${episode.episodeNumber}`}
-                      seasonNumber={season.seasonNumber}
-                      episodeNumber={episode.episodeNumber}
-                      title={episode.title}
-                      summary={episode.summary}
-                      songs={episode.songs}
-                    />
-                  ))}
-                </div>
-              </section>
-            ))}
-          </div>
-        </div>
-
-        <aside className="space-y-10">
+      <section className="mt-14 space-y-14">
+        {hasTimestampLookup ? (
           <section>
-            <div className="mb-6">
-              <SplitHeading
-                kicker="Season navigator"
-                leadTitle="Jump To"
-                outlineTitle="Seasons"
-                compact
-              />
-            </div>
-            <div className="route-surface px-1 py-5">
-              <div className="route-tag-list">
-                {series.seasons.map((season) => (
-                  <span key={season.seasonNumber} className="route-tag">
-                    Season {season.seasonNumber}
-                  </span>
-                ))}
-              </div>
-            </div>
+            <TimestampLookup contentTitle={series.title} items={flattenedSongs} />
           </section>
+        ) : null}
 
-          <section>
-            <div className="mb-6">
-              <SplitHeading
-                kicker="Full index"
-                leadTitle="Series-Wide"
-                outlineTitle="Playlist"
-                compact
-              />
-            </div>
-            <SoundtrackList items={flattenedSongs} showEpisode variant="bulletin" />
-          </section>
-        </aside>
+        <section>
+          <SeriesSceneMap seasons={series.seasons} />
+        </section>
       </section>
     </div>
   );

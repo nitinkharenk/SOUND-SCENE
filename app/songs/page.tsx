@@ -2,14 +2,11 @@ import Link from "next/link";
 import { CatalogBrowseControls } from "@/components/catalog-browse-controls";
 import { RouteMeta, SplitHeading } from "@/components/route-heading";
 import { buildBrowseHref, getVisiblePages, normalizeParam } from "@/lib/browse";
-import { songItems } from "@/lib/discovery";
+import { getSongCards, getSongCardCount, getSongFilterOptions } from "@/lib/content-store";
+import { getSongCategory, resolveSongArtwork } from "@/lib/song-presentation";
+import { pluralize } from "@/lib/text";
 
 const PAGE_SIZE = 12;
-
-const songs = [...songItems].sort(
-  (left, right) =>
-    right.appearances.length - left.appearances.length || right.year - left.year,
-);
 
 type SongsPageProps = {
   searchParams: Promise<{
@@ -25,27 +22,6 @@ type SongsPageProps = {
 
 type SongSort = "appearances" | "newest" | "oldest" | "title";
 
-function sortSongs(items: typeof songs, sort: SongSort) {
-  const sorted = [...items];
-
-  if (sort === "newest") {
-    return sorted.sort((left, right) => right.year - left.year || right.title.localeCompare(left.title));
-  }
-
-  if (sort === "oldest") {
-    return sorted.sort((left, right) => left.year - right.year || left.title.localeCompare(right.title));
-  }
-
-  if (sort === "title") {
-    return sorted.sort((left, right) => left.title.localeCompare(right.title));
-  }
-
-  return sorted.sort(
-    (left, right) =>
-      right.appearances.length - left.appearances.length || right.year - left.year,
-  );
-}
-
 export default async function SongsPage({ searchParams }: SongsPageProps) {
   const params = await searchParams;
   const query = normalizeParam(params.q).trim();
@@ -59,52 +35,33 @@ export default async function SongsPage({ searchParams }: SongsPageProps) {
     ? sortValue
     : "appearances") as SongSort;
 
-  const categories = [...new Set(songs.map((song) => song.category))].sort((a, b) =>
-    a.localeCompare(b),
-  );
-  const formats = [...new Set(songs.map((song) => song.relatedType))].sort((a, b) =>
-    a.localeCompare(b),
-  );
-  const artists = [...new Set(songs.map((song) => song.artist))].sort((a, b) =>
-    a.localeCompare(b),
-  );
-  const years = [...new Set(songs.filter((song) => song.year > 0).map((song) => String(song.year)))].sort(
-    (a, b) => Number(b) - Number(a),
-  );
+  const filterParams = {
+    query: query || undefined,
+    category: category || undefined,
+    artist: artist || undefined,
+    year: year ? Number(year) : undefined,
+  };
 
-  const filteredSongs = sortSongs(
-    songs.filter((song) => {
-      const matchesQuery = query
-        ? [
-            song.title,
-            song.artist,
-            song.mood,
-            song.relatedTitle,
-            song.relatedType,
-            song.category,
-            song.year,
-          ]
-            .join(" ")
-            .toLowerCase()
-            .includes(query.toLowerCase())
-        : true;
-      const matchesCategory = category ? song.category === category : true;
-      const matchesFormat = format ? song.relatedType === format : true;
-      const matchesArtist = artist ? song.artist === artist : true;
-      const matchesYear = year ? String(song.year) === year : true;
-
-      return matchesQuery && matchesCategory && matchesFormat && matchesArtist && matchesYear;
+  const [totalCount, filterOptions, visibleSongs] = await Promise.all([
+    getSongCardCount(filterParams),
+    getSongFilterOptions(),
+    getSongCards({
+      ...filterParams,
+      limit: PAGE_SIZE,
+      skip: (Math.max(1, requestedPage) - 1) * PAGE_SIZE,
+      appearanceLimit: 1,
+      sort,
     }),
-    sort,
-  );
+  ]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredSongs.length / PAGE_SIZE));
+  const { categories, artists } = filterOptions;
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
   const currentPage =
     Number.isFinite(requestedPage) && requestedPage > 0
       ? Math.min(requestedPage, totalPages)
       : 1;
   const pageStart = (currentPage - 1) * PAGE_SIZE;
-  const visibleSongs = filteredSongs.slice(pageStart, pageStart + PAGE_SIZE);
   const visiblePages = getVisiblePages(currentPage, totalPages);
 
   return (
@@ -119,7 +76,7 @@ export default async function SongsPage({ searchParams }: SongsPageProps) {
           />
           <RouteMeta
             items={[
-              `${filteredSongs.length} songs`,
+              pluralize(totalCount, "song"),
               `Page ${currentPage} of ${totalPages}`,
               "Scene-linked soundtrack library",
             ]}
@@ -132,9 +89,7 @@ export default async function SongsPage({ searchParams }: SongsPageProps) {
           searchPlaceholder="Search songs, artists, moods, titles, or years"
           filters={[
             { param: "category", label: "Category", allLabel: "All categories", options: categories },
-            { param: "format", label: "Format", allLabel: "All formats", options: formats },
             { param: "artist", label: "Artist", allLabel: "All artists", options: artists },
-            { param: "year", label: "Year", allLabel: "All years", options: years },
           ]}
           sortOptions={[
             { value: "appearances", label: "Most appearances" },
@@ -147,28 +102,48 @@ export default async function SongsPage({ searchParams }: SongsPageProps) {
       </section>
 
       {visibleSongs.length > 0 ? (
-        <section className="mt-12 grid gap-8 md:grid-cols-2 xl:grid-cols-3">
-          {visibleSongs.map((song) => (
-            <Link key={song.slug} href={song.href} className="hover-card group block">
-              <div className="aspect-[1.18/0.74] overflow-hidden rounded-[0.4rem] bg-[#ede5da]">
+        <section className="mt-12 route-surface">
+          {visibleSongs.map((song, index) => (
+            <Link
+              key={song.slug}
+              href={`/songs/${song.slug}`}
+              className="route-row-link sm:grid-cols-[72px_180px_1fr]"
+            >
+              <div className="font-heading text-4xl font-bold leading-none tracking-tight text-black/22">
+                {String(pageStart + index + 1).padStart(2, "0")}
+              </div>
+              <div className="aspect-[1.08/0.86] overflow-hidden rounded-[0.42rem] bg-[#ede5da]">
                 <img
-                  src={song.image}
+                  src={resolveSongArtwork({ artwork: song.artwork, category: getSongCategory(song.mood), mood: song.mood })}
                   alt={song.title}
                   className="hover-card-media h-full w-full object-cover"
                 />
               </div>
-              <div className="pt-5">
-                <span className="route-tag">{song.category}</span>
-                <h2 className="hover-card-title card-heading mt-3 text-2xl font-semibold leading-tight text-black">
+              <div className="flex min-h-full flex-col">
+                <p className="route-kicker text-[0.72rem]">
+                  {getSongCategory(song.mood)}
+                </p>
+                <h2 className="card-heading clamp-2 mt-2 min-h-[3.4rem] text-2xl font-semibold leading-tight text-black">
                   {song.title}
                 </h2>
-                <p className="mt-2 font-card text-base font-medium text-black/74">{song.artist}</p>
-                <p className="mt-3 font-body text-sm font-normal text-black/58">
-                  {song.appearances.length} appearances · {song.relatedTitle}
+                <p className="clamp-1 mt-2 font-card text-base font-medium text-black/74">{song.artist}</p>
+                <p className="clamp-1 mt-2 font-body text-sm font-normal text-black/58">
+                  {pluralize(song.appearances.length, "appearance")}
                 </p>
-                <p className="mt-3 font-body text-base font-normal leading-relaxed text-black/64">
+                <p className="clamp-2 mt-3 min-h-[3.15rem] font-body text-base font-normal leading-relaxed text-black/64">
                   {song.mood}
                 </p>
+                {song.appearances[0] ? (
+                  <p className="clamp-2 mt-auto pt-3 font-body text-sm font-normal text-black/58">
+                    First mapped cue: {song.appearances[0].contentTitle}
+                    {song.appearances[0].seasonNumber && song.appearances[0].episodeNumber
+                      ? ` · S${song.appearances[0].seasonNumber}E${song.appearances[0].episodeNumber}`
+                      : ""}
+                    {song.appearances[0].timestamp
+                      ? ` · ${song.appearances[0].timestamp}`
+                      : ""}
+                  </p>
+                ) : null}
               </div>
             </Link>
           ))}
@@ -180,14 +155,19 @@ export default async function SongsPage({ searchParams }: SongsPageProps) {
             No songs matched the current search and filter combination. Try another category,
             artist, format, year, or keyword.
           </p>
+          <div className="mt-5">
+            <Link href="/songs" className="route-action route-action-primary">
+              Clear all song filters
+            </Link>
+          </div>
         </section>
       )}
 
-      {filteredSongs.length > PAGE_SIZE ? (
+      {totalCount > PAGE_SIZE ? (
         <section className="mt-12 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="font-body text-sm font-normal text-[color:var(--muted)]">
-            Showing {pageStart + 1}-{Math.min(pageStart + PAGE_SIZE, filteredSongs.length)} of{" "}
-            {filteredSongs.length} songs
+            Showing {pageStart + 1}-{Math.min(pageStart + PAGE_SIZE, totalCount)} of{" "}
+            {pluralize(totalCount, "song")}
           </p>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -211,27 +191,33 @@ export default async function SongsPage({ searchParams }: SongsPageProps) {
               Previous
             </Link>
 
-            {visiblePages.map((page) => (
-              <Link
-                key={page}
-                href={buildBrowseHref(
-                  "/songs",
-                  {
-                    q: query,
-                    category,
-                    format,
-                    artist,
-                    year,
-                    sort,
-                    page,
-                  },
-                  { defaultSort: "appearances" },
-                )}
-                className={page === currentPage ? "route-action route-action-primary" : "route-action"}
-              >
-                {page}
-              </Link>
-            ))}
+            {visiblePages.map((page, index) =>
+              page === "..." ? (
+                <span key={`ellipsis-${index}`} className="px-2 font-body text-sm text-[color:var(--muted)]">
+                  ...
+                </span>
+              ) : (
+                <Link
+                  key={page}
+                  href={buildBrowseHref(
+                    "/songs",
+                    {
+                      q: query,
+                      category,
+                      format,
+                      artist,
+                      year,
+                      sort,
+                      page,
+                    },
+                    { defaultSort: "appearances" },
+                  )}
+                  className={page === currentPage ? "route-action route-action-primary" : "route-action"}
+                >
+                  {page}
+                </Link>
+              ),
+            )}
 
             <Link
               href={buildBrowseHref(

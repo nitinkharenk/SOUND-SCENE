@@ -1,7 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { RouteMeta, SplitHeading } from "@/components/route-heading";
-import { getRelatedSongs, getSongBySlug, getStaticSongParams } from "@/lib/catalog";
+import { RouteMeta, RouteTagList, SplitHeading } from "@/components/route-heading";
+import {
+  getRelatedSongs,
+  getSongBySlug,
+  getStaticSongParams,
+} from "@/lib/content-store";
+import { getSongCategory } from "@/lib/song-presentation";
+import { pluralize, slugifyLabel } from "@/lib/text";
 
 type SongDetailPageProps = {
   params: Promise<{
@@ -9,19 +15,21 @@ type SongDetailPageProps = {
   }>;
 };
 
-export function generateStaticParams() {
+export async function generateStaticParams() {
   return getStaticSongParams();
 }
 
 export default async function SongDetailPage({ params }: SongDetailPageProps) {
   const { slug } = await params;
-  const song = getSongBySlug(slug);
+  const song = await getSongBySlug(slug);
 
   if (!song) {
     notFound();
   }
 
-  const relatedSongs = getRelatedSongs(song.slug);
+  const relatedSongs = await getRelatedSongs(song.slug);
+  const primaryAppearance = song.appearances[0];
+  const songCategory = getSongCategory(song.mood);
 
   return (
     <div className="route-shell">
@@ -31,9 +39,40 @@ export default async function SongDetailPage({ params }: SongDetailPageProps) {
             kicker="Song detail"
             leadTitle={song.title}
             outlineTitle="Track"
+            mode="detail"
             description={song.mood}
           />
-          <RouteMeta items={[song.artist, `${song.appearances.length} appearances`]} />
+          <RouteMeta items={[song.artist, pluralize(song.appearances.length, "appearance")]} />
+          <div className="mt-6">
+            <RouteTagList
+              items={[
+                {
+                  label: songCategory,
+                  href: `/songs?category=${encodeURIComponent(songCategory)}`,
+                },
+              ]}
+              tone="accent"
+            />
+          </div>
+          {primaryAppearance ? (
+            <div className="mt-6 rounded-[0.9rem] border border-[color:var(--line)] bg-accent-subtle p-4">
+              <p className="route-kicker">Heard in</p>
+              <p className="mt-2 font-body text-base leading-relaxed text-[color:var(--foreground)]">
+                {primaryAppearance.contentTitle}
+                {primaryAppearance.seasonNumber && primaryAppearance.episodeNumber
+                  ? ` · S${primaryAppearance.seasonNumber}E${primaryAppearance.episodeNumber}`
+                  : ""}
+                {" · "}
+                Scene: {primaryAppearance.sceneType}
+                {primaryAppearance.timestamp ? `, ${primaryAppearance.timestamp}` : ""}
+              </p>
+            </div>
+          ) : null}
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Link href={`/artists/${slugifyLabel(song.artist)}`} className="route-action focus-ring">
+              View Artist Profile
+            </Link>
+          </div>
           <div className="flex flex-wrap gap-2">
             <a
               href={song.youtubeLink}
@@ -67,7 +106,7 @@ export default async function SongDetailPage({ params }: SongDetailPageProps) {
           <div className="route-surface">
             {song.appearances.map((appearance) => (
               <Link
-                key={`${appearance.contentSlug}-${appearance.timestamp}`}
+                key={`${appearance.contentSlug}-${appearance.timestamp ?? "untimed"}-${appearance.sceneType}`}
                 href={`/${
                   appearance.contentType === "movie" ? "movies" : "series"
                 }/${appearance.contentSlug}`}
@@ -81,7 +120,7 @@ export default async function SongDetailPage({ params }: SongDetailPageProps) {
                       : ""}
                   </p>
                   <h2 className="card-heading mt-2 text-2xl font-semibold leading-tight text-black">
-                    {appearance.timestamp}
+                    {appearance.timestamp ?? appearance.sceneType}
                   </h2>
                   <p className="mt-3 font-body text-base font-normal leading-relaxed text-black/62">
                     {appearance.sceneDescription}
@@ -113,7 +152,7 @@ export default async function SongDetailPage({ params }: SongDetailPageProps) {
             >
               <div className="route-surface py-5">
                 <p className="route-kicker text-[0.72rem]">
-                  {relatedSong.appearances.length} appearances
+                  {pluralize(relatedSong.appearances.length, "appearance")}
                 </p>
                 <h3 className="hover-card-title card-heading mt-2 text-2xl font-semibold leading-tight text-black">
                   {relatedSong.title}

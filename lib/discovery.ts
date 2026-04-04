@@ -1,209 +1,198 @@
 import {
-  catalog,
-  songLibrary,
+  getCatalogCards,
+  getHomeEpisodeCards,
+  getSongCards,
   type CatalogEntry,
-  type SeriesEntry,
   type SongLibraryItem,
-} from "@/lib/catalog";
+} from "@/lib/content-store";
+import { getSongCategory, resolveSongArtwork } from "@/lib/song-presentation";
+import {
+  type DiscoveryContentItem,
+  type DiscoveryItem,
+  type DiscoverySongItem,
+  type FilterId,
+  type TrendingSongItem,
+  type WeeklyEpisodeItem,
+} from "@/lib/discovery-types";
+import { pluralize } from "@/lib/text";
 
-export const filters = [
-  { id: "movies", label: "Movies" },
-  { id: "series", label: "Web Series" },
-  { id: "songs", label: "Songs" },
-] as const;
+export type {
+  DiscoveryContentItem,
+  DiscoveryItem,
+  DiscoverySongItem,
+  FilterId,
+  TrendingSongItem,
+  WeeklyEpisodeItem,
+} from "@/lib/discovery-types";
+export {
+  filters,
+  getBrowseHrefForFilter,
+  getBrowseLabelForFilter,
+  isSongItem,
+} from "@/lib/discovery-types";
 
-export type FilterId = (typeof filters)[number]["id"];
+export async function getDiscoveryData(options?: {
+  contentLimit?: number;
+  songLimit?: number;
+}): Promise<{
+  contentItems: DiscoveryContentItem[];
+  songItems: DiscoverySongItem[];
+}> {
+  const contentLimit = options?.contentLimit ?? 50;
+  const songLimit = options?.songLimit ?? 50;
 
-export type DiscoveryContentItem = {
-  slug: string;
-  title: string;
-  type: CatalogEntry["type"];
-  year: number;
-  rating: string;
-  poster: string;
-  backdrop: string;
-  href: string;
-  label: "Movie" | "Web Series";
-  meta: string;
-  genres: string[];
-  description: string;
-  runtime?: string;
-  seasonsCount?: number;
-};
+  const [catalog, songLibrary] = await Promise.all([
+    getCatalogCards({ limit: contentLimit }),
+    getSongCards({ limit: songLimit, appearanceLimit: 1 }),
+  ]);
 
-export type DiscoverySongItem = SongLibraryItem & {
-  href: string;
-  image: string;
-  label: "Song";
-  relatedTitle: string;
-  relatedType: "Movie" | "Web Series";
-  meta: string;
-  category: string;
-  year: number;
-};
+  const catalogBySlug = new Map<string, CatalogEntry>(
+    catalog.map((entry) => [entry.slug, entry]),
+  );
 
-export type DiscoveryItem = DiscoveryContentItem | DiscoverySongItem;
-export type TrendingSongItem = DiscoverySongItem & { rank: number };
-
-export type WeeklyEpisodeItem = {
-  id: string;
-  href: string;
-  image: string;
-  label: "Episode";
-  seriesTitle: string;
-  episodeTitle: string;
-  episodeCode: string;
-  summary: string;
-  songsCount: number;
-  leadSong: string;
-  year: number;
-};
-
-const catalogBySlug = new Map<string, CatalogEntry>(
-  catalog.map((entry) => [entry.slug, entry]),
-);
-
-export const contentItems: DiscoveryContentItem[] = catalog.map((entry) => ({
-  slug: entry.slug,
-  title: entry.title,
-  type: entry.type,
-  year: entry.year,
-  rating: entry.rating,
-  poster: entry.poster,
-  backdrop: entry.backdrop,
-  href: `/${entry.type === "movie" ? "movies" : "series"}/${entry.slug}`,
-  label: entry.type === "movie" ? "Movie" : "Web Series",
-  meta:
-    entry.type === "movie"
-      ? `${entry.runtime} · ${entry.platform}`
-      : `${entry.seasonsCount} season${entry.seasonsCount > 1 ? "s" : ""} · ${entry.platform}`,
-  genres: entry.genres,
-  description: entry.description,
-  runtime: entry.type === "movie" ? entry.runtime : undefined,
-  seasonsCount: entry.type === "series" ? entry.seasonsCount : undefined,
-}));
-
-const categoryMap: Record<string, string> = {
-  "Synthetic rush": "Synthwave",
-  "Dark dance-pop": "Alt Pop",
-  "Triumphant slow burn": "Synthwave",
-  "Cocktail groove": "Neo Soul",
-  "Tension soul": "Alt Pop",
-  "Confident closer": "Indie Pop",
-  "Warm lo-fi soul": "Ambient",
-  "Tender ache": "Dream Pop",
-  "Big emotional release": "Alt Pop",
-  "Ambient dread": "Ambient",
-  "Frozen crescendo": "Electronic",
-  "Urgent shimmer": "Alt Pop",
-  "Heroic tension": "Electronic",
-  "Pulse-heavy noir": "Synthwave",
-  "Slick and suspicious": "Alt Pop",
-  "Chillwave clue drop": "Synthwave",
-};
-
-export const songItems: DiscoverySongItem[] = songLibrary.map((song) => {
-  const appearance = song.appearances[0];
-  const relatedEntry = appearance ? catalogBySlug.get(appearance.contentSlug) : null;
-
-  return {
-    ...song,
-    href: `/songs/${song.slug}`,
-    image: relatedEntry?.poster ?? relatedEntry?.backdrop ?? "",
-    label: "Song" as const,
-    relatedTitle: relatedEntry?.title ?? "Soundtrack feature",
-    relatedType: appearance?.contentType === "movie" ? "Movie" : "Web Series",
-    meta: `${song.artist} · ${song.mood}`,
-    category: categoryMap[song.mood] ?? "Soundtrack",
-    year: relatedEntry?.year ?? 0,
-  };
-});
-
-export const popularCollections: Record<FilterId, DiscoveryItem[]> = {
-  movies: [...contentItems]
-    .filter((entry) => entry.type === "movie")
-    .sort((left, right) => Number(right.rating) - Number(left.rating)),
-  series: [...contentItems]
-    .filter((entry) => entry.type === "series")
-    .sort((left, right) => Number(right.rating) - Number(left.rating)),
-  songs: [...songItems].sort(
-    (left, right) =>
-      right.appearances.length - left.appearances.length || right.year - left.year,
-  ),
-};
-
-export const latestCollections: Record<FilterId, DiscoveryItem[]> = {
-  movies: [...contentItems]
-    .filter((entry) => entry.type === "movie")
-    .sort(
-      (left, right) =>
-        right.year - left.year || Number(right.rating) - Number(left.rating),
-    ),
-  series: [...contentItems]
-    .filter((entry) => entry.type === "series")
-    .sort(
-      (left, right) =>
-        right.year - left.year || Number(right.rating) - Number(left.rating),
-    ),
-  songs: [...songItems].sort((left, right) => right.year - left.year),
-};
-
-export const trendingStories: TrendingSongItem[] = [...songItems]
-  .sort(
-    (left, right) =>
-      right.appearances.length - left.appearances.length || right.year - left.year,
-  )
-  .slice(0, 4)
-  .map((item, index) => ({
-    ...item,
-    rank: index + 1,
+  const contentItems: DiscoveryContentItem[] = catalog.map((entry) => ({
+    slug: entry.slug,
+    title: entry.title,
+    type: entry.type,
+    year: entry.year,
+    rating: entry.rating,
+    poster: entry.poster,
+    backdrop: entry.backdrop,
+    href: `/${entry.type === "movie" ? "movies" : "series"}/${entry.slug}`,
+    label: entry.type === "movie" ? "Movie" : "Series",
+    meta:
+      entry.type === "movie"
+        ? `${entry.runtime} · ${entry.platform}`
+        : `${pluralize(entry.seasonsCount, "season")} · ${entry.platform}`,
+    genres: entry.genres,
+    description: entry.description,
+    runtime: entry.type === "movie" ? entry.runtime : undefined,
+    seasonsCount: entry.type === "series" ? entry.seasonsCount : undefined,
   }));
 
-export const weeklyEpisodes: WeeklyEpisodeItem[] = catalog
-  .filter((entry): entry is SeriesEntry => entry.type === "series")
-  .flatMap((entry) =>
-    entry.seasons.flatMap((season) =>
-      season.episodes.map((episode) => ({
-        id: `${entry.slug}-${season.seasonNumber}-${episode.episodeNumber}`,
-        href: `/series/${entry.slug}`,
-        image: entry.backdrop,
-        label: "Episode" as const,
-        seriesTitle: entry.title,
-        episodeTitle: episode.title,
-        episodeCode: `S${season.seasonNumber} · E${episode.episodeNumber}`,
-        summary: episode.summary,
-        songsCount: episode.songs.length,
-        leadSong: episode.songs[0]?.song.title ?? "Soundtrack update",
-        year: entry.year,
-      })),
+  const songItems: DiscoverySongItem[] = songLibrary.map((song) => {
+    const appearance = song.appearances[0];
+    const relatedEntry = appearance ? catalogBySlug.get(appearance.contentSlug) : null;
+    const category = getSongCategory(song.mood);
+
+    return {
+      ...song,
+      href: `/songs/${song.slug}`,
+      image: resolveSongArtwork({
+        artwork: song.artwork,
+        category,
+        mood: song.mood,
+      }),
+      label: "Song",
+      relatedTitle: relatedEntry?.title ?? song.album ?? "Soundtrack library",
+      relatedType: relatedEntry
+        ? relatedEntry.type === "movie"
+          ? "Movie"
+          : "Series"
+        : "Track",
+      meta: `${song.artist} · ${song.mood}`,
+      category,
+      year: relatedEntry?.year ?? 0,
+    };
+  });
+
+  return {
+    contentItems,
+    songItems,
+  };
+}
+
+export async function getHomeDiscoveryData(): Promise<{
+  popularCollections: Record<FilterId, DiscoveryItem[]>;
+  latestCollections: Record<FilterId, DiscoveryItem[]>;
+  trendingStories: TrendingSongItem[];
+  weeklyEpisodes: WeeklyEpisodeItem[];
+}> {
+  const [{ contentItems, songItems }, homeEpisodes] = await Promise.all([
+    getDiscoveryData(),
+    getHomeEpisodeCards(60),
+  ]);
+
+  const popularCollections: Record<FilterId, DiscoveryItem[]> = {
+    movies: [...contentItems]
+      .filter((entry) => entry.type === "movie")
+      .sort((left, right) => Number(right.rating) - Number(left.rating)),
+    series: [...contentItems]
+      .filter((entry) => entry.type === "series")
+      .sort((left, right) => Number(right.rating) - Number(left.rating)),
+    songs: [...songItems].sort(
+      (left, right) =>
+        right.appearances.length - left.appearances.length || right.year - left.year,
     ),
-  )
-  .sort((left, right) => right.year - left.year || right.id.localeCompare(left.id));
+  };
 
-export function isSongItem(item: DiscoveryItem): item is DiscoverySongItem {
-  return "appearances" in item;
+  const latestCollections: Record<FilterId, DiscoveryItem[]> = {
+    movies: [...contentItems]
+      .filter((entry) => entry.type === "movie")
+      .sort(
+        (left, right) =>
+          right.year - left.year || Number(right.rating) - Number(left.rating),
+      ),
+    series: [...contentItems]
+      .filter((entry) => entry.type === "series")
+      .sort(
+        (left, right) =>
+          right.year - left.year || Number(right.rating) - Number(left.rating),
+      ),
+    songs: [...songItems].sort((left, right) => right.year - left.year),
+  };
+
+  const trendingStories: TrendingSongItem[] = [...songItems]
+    .sort(
+      (left, right) =>
+        right.appearances.length - left.appearances.length || right.year - left.year,
+    )
+    .slice(0, 4)
+    .map((item, index) => ({
+      ...item,
+      rank: index + 1,
+    }));
+
+  const weeklyEpisodes: WeeklyEpisodeItem[] = homeEpisodes.map((episode) => ({
+    id: `${episode.seriesSlug}-${episode.seasonNumber}-${episode.episodeNumber}-${episode.id}`,
+    href: `/series/${episode.seriesSlug}`,
+    image: episode.image,
+    label: "Episode" as const,
+    seriesTitle: episode.seriesTitle,
+    episodeTitle: episode.episodeTitle,
+    episodeCode: `S${episode.seasonNumber} · E${episode.episodeNumber}`,
+    summary: episode.summary,
+    songsCount: episode.songsCount,
+    leadSong: episode.leadSong,
+    year: episode.seriesYear,
+  }));
+
+  return {
+    popularCollections,
+    latestCollections,
+    trendingStories,
+    weeklyEpisodes,
+  };
 }
 
-export function getBrowseHrefForFilter(filterId: FilterId): string {
-  if (filterId === "movies") {
-    return "/movies";
-  }
+export async function getNavData(): Promise<{
+  trendingContent: CatalogEntry[];
+  movieHighlights: CatalogEntry[];
+  seriesHighlights: CatalogEntry[];
+  popularSongs: SongLibraryItem[];
+}> {
+  const [catalog, popularSongs] = await Promise.all([
+    getCatalogCards({ limit: 12 }),
+    getSongCards({ limit: 5, appearanceLimit: 1 }),
+  ]);
 
-  if (filterId === "series") {
-    return "/series";
-  }
+  const movies = catalog.filter((e) => e.type === "movie");
+  const series = catalog.filter((e) => e.type === "series");
 
-  return "/songs";
-}
-
-export function getBrowseLabelForFilter(filterId: FilterId): string {
-  if (filterId === "movies") {
-    return "movies";
-  }
-
-  if (filterId === "series") {
-    return "series";
-  }
-
-  return "songs";
+  return {
+    trendingContent: catalog.slice(0, 4),
+    movieHighlights: movies.slice(0, 6),
+    seriesHighlights: series.slice(0, 6),
+    popularSongs,
+  };
 }

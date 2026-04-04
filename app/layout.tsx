@@ -2,13 +2,18 @@ import type { Metadata } from "next";
 import { Suspense, type ReactNode } from "react";
 import "./globals.css";
 import { GlobalSearchMount } from "@/components/global-search-mount";
+import { getThemeBootScript } from "@/lib/theme";
+import { KeyboardShortcuts } from "@/components/keyboard-shortcuts";
 import { NavBar } from "@/components/nav-bar";
 import { SiteFooter } from "@/components/site-footer";
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://soundscene.vercel.app";
+
 export const metadata: Metadata = {
   title: "SoundScene | Movie & Series Soundtrack Finder",
+  metadataBase: new URL(siteUrl),
   description:
-    "Discover soundtrack moments in movies and web series with scene-level context, curated metadata, and editorial browsing.",
+    "Discover soundtrack moments in movies and series with scene-level context, curated metadata, and editorial browsing.",
 };
 
 type RootLayoutProps = Readonly<{
@@ -21,16 +26,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `
-              (() => {
-                try {
-                  const storedTheme = localStorage.getItem("theme");
-                  document.documentElement.dataset.theme = storedTheme === "dark" ? "dark" : "light";
-                } catch (error) {
-                  document.documentElement.dataset.theme = "light";
-                }
-              })();
-            `,
+            __html: getThemeBootScript(),
           }}
         />
       </head>
@@ -40,6 +36,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
           <Suspense fallback={null}>
             <GlobalSearchMount />
           </Suspense>
+          <KeyboardShortcuts />
           <main>{children}</main>
           <SiteFooter />
         </div>

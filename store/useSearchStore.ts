@@ -7,6 +7,7 @@ interface SearchStore {
   query: string;
   activeFilters: string[];
   open: () => void;
+  collapse: () => void;
   close: () => void;
   setQuery: (query: string) => void;
   toggleFilter: (id: string) => void;
@@ -18,6 +19,7 @@ export const useSearchStore = create<SearchStore>((set) => ({
   query: "",
   activeFilters: [],
   open: () => set({ isOpen: true }),
+  collapse: () => set({ isOpen: false }),
   close: () => set({ isOpen: false, query: "", activeFilters: [] }),
   setQuery: (query) => set({ query }),
   toggleFilter: (id) =>

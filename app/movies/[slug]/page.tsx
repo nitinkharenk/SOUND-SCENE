@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { SoundtrackList } from "@/components/soundtrack-list";
+import { MovieSceneFilterPanel } from "@/components/movie-scene-filter-panel";
+import { TimestampLookup } from "@/components/timestamp-lookup";
 import { RouteMeta, RouteTagList, SplitHeading } from "@/components/route-heading";
-import { getContentBySlug, getRelatedMovies, getStaticMovieParams } from "@/lib/catalog";
+import { getMovieBySlug, getRelatedMovies, getStaticMovieParams } from "@/lib/content-store";
+import { hasParseableTimestamp } from "@/lib/text";
 
 type MovieDetailPageProps = {
   params: Promise<{
@@ -10,19 +12,20 @@ type MovieDetailPageProps = {
   }>;
 };
 
-export function generateStaticParams() {
+export async function generateStaticParams() {
   return getStaticMovieParams();
 }
 
 export default async function MovieDetailPage({ params }: MovieDetailPageProps) {
   const { slug } = await params;
-  const movie = getContentBySlug("movie", slug);
+  const movie = await getMovieBySlug(slug);
 
   if (!movie) {
     notFound();
   }
 
-  const relatedMovies = getRelatedMovies(movie.slug);
+  const relatedMovies = await getRelatedMovies(movie.slug);
+  const hasTimestampLookup = movie.soundtrack.some((item) => hasParseableTimestamp(item.timestamp));
 
   return (
     <div className="route-shell">
@@ -32,13 +35,20 @@ export default async function MovieDetailPage({ params }: MovieDetailPageProps) 
             kicker="Movie soundtrack guide"
             leadTitle={movie.title}
             outlineTitle="Soundtrack"
+            mode="detail"
             description={movie.description}
           />
           <RouteMeta
             items={[movie.year, movie.runtime, movie.platform, `Rating ${movie.rating}`]}
           />
           <div className="mt-6">
-            <RouteTagList items={movie.genres} tone="accent" />
+            <RouteTagList
+              items={movie.genres.map((genre) => ({
+                label: genre,
+                href: `/movies?genre=${encodeURIComponent(genre)}`,
+              }))}
+              tone="accent"
+            />
           </div>
         </div>
 
@@ -58,29 +68,13 @@ export default async function MovieDetailPage({ params }: MovieDetailPageProps) 
             />
           </div>
           {/* Keep Syne section headings at least 12px larger than nearby Cabinet soundtrack titles. */}
-          <SoundtrackList items={movie.soundtrack} />
+          <MovieSceneFilterPanel items={movie.soundtrack} />
         </div>
 
         <aside className="space-y-10">
-          <section>
-            <div className="mb-4">
-              <SplitHeading
-                kicker="Browse scenes"
-                leadTitle="Scene"
-                outlineTitle="Filters"
-                compact
-              />
-            </div>
-            <div className="route-tag-list route-surface py-5">
-              {["Opening", "Montage", "Club", "Reveal", "Finale", "Breakup"].map(
-                (label) => (
-                  <span key={label} className="route-tag">
-                    {label}
-                  </span>
-                ),
-              )}
-            </div>
-          </section>
+          {hasTimestampLookup ? (
+            <TimestampLookup contentTitle={movie.title} items={movie.soundtrack} />
+          ) : null}
 
           <section>
           <div className="mb-4">

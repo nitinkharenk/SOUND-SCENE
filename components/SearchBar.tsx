@@ -1,18 +1,17 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import SearchResults from "@/components/SearchResults";
 import { useSearchStore } from "@/store/useSearchStore";
+import { SEARCH_MIN_QUERY, useDebouncedValue } from "@/lib/use-search-results";
 
 const FILTERS = [
   { id: "movies", label: "Movies" },
-  { id: "tv", label: "TV Shows" },
+  { id: "tv", label: "Series" },
   { id: "songs", label: "Songs" },
   { id: "artists", label: "Artists" },
-  { id: "albums", label: "Albums" },
-  { id: "podcasts", label: "Podcasts" },
 ] as const;
 
 function SearchIcon({ className = "" }: { className?: string }) {
@@ -71,70 +70,116 @@ function CloseIcon({ className = "" }: { className?: string }) {
 }
 
 type SearchBarProps = {
-  inline?: boolean;
+  mode?: "inline" | "page" | "redirect";
 };
 
-export default function SearchBar({ inline = true }: SearchBarProps) {
-  const { isOpen, query, activeFilters, open, close, setQuery, toggleFilter } = useSearchStore();
+export default function SearchBar({ mode = "inline" }: SearchBarProps) {
+  const { isOpen, query, activeFilters, open, collapse, close, setQuery, toggleFilter } =
+    useSearchStore();
   const inputRef = useRef<HTMLInputElement>(null);
   const hasSyncedUrl = useRef(false);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [navOffset, setNavOffset] = useState(104);
-  const [debouncedQuery, setDebouncedQuery] = useState(query);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
+  const debouncedQuery = useDebouncedValue(query);
+  const isInlineMode = mode === "inline";
+  const isPageMode = mode === "page";
+  const isRedirectMode = mode === "redirect";
+  const isExpanded = isPageMode || isOpen;
+  const urlQuery = searchParams.get("q") ?? "";
+  const displayedQuery = useMemo(() => {
+    if (!query && (isInlineMode || isPageMode) && urlQuery) {
+      return urlQuery;
+    }
+
+    return query;
+  }, [isInlineMode, isPageMode, query, urlQuery]);
 
   const handleOpen = () => {
-    if (!isOpen) {
+    if (!isPageMode && !isOpen) {
       open();
     }
   };
 
-  const syncUrl = (nextQuery: string) => {
-    if (pathname !== "/") return;
+  const replaceBrowserUrl = (targetPathname: string, nextQuery: string) => {
+    const params = new URLSearchParams(window.location.search);
+    const trimmedQuery = nextQuery.trim();
 
-    const params = new URLSearchParams(searchParams.toString());
-
-    if (nextQuery.trim()) {
-      params.set("q", nextQuery.trim());
+    if (trimmedQuery) {
+      params.set("q", trimmedQuery);
     } else {
       params.delete("q");
     }
 
-    const nextUrl = params.toString() ? `${pathname}?${params.toString()}` : pathname;
-    const currentUrl = searchParams.toString() ? `${pathname}?${searchParams.toString()}` : pathname;
+    const nextUrl = params.toString()
+      ? `${targetPathname}?${params.toString()}`
+      : targetPathname;
+    const currentUrl = `${window.location.pathname}${window.location.search}`;
 
     if (nextUrl !== currentUrl) {
-      router.replace(nextUrl, { scroll: false });
+      window.history.replaceState(null, "", nextUrl);
     }
+  };
+
+  const syncUrl = (nextQuery: string) => {
+    if (isRedirectMode) {
+      return;
+    }
+
+    replaceBrowserUrl(isPageMode ? "/search" : "/", nextQuery);
+  };
+
+  const navigateToSearchPage = (nextQuery: string) => {
+    const trimmedQuery = nextQuery.trim();
+
+    if (trimmedQuery.length < SEARCH_MIN_QUERY) {
+      return;
+    }
+
+    router.push(`/search?q=${encodeURIComponent(trimmedQuery)}`);
+    collapse();
   };
 
   const handleClose = () => {
     close();
-    syncUrl("");
+    if (!isRedirectMode) {
+      syncUrl("");
+    }
   };
 
-  const useInlineMobileLayout = inline && isMobileViewport;
+  const useInlineMobileLayout = isInlineMode && isMobileViewport;
 
   const commitSearch = (nextQuery: string) => {
     const trimmedQuery = nextQuery.trim();
 
     setQuery(nextQuery);
-    setDebouncedQuery(nextQuery);
     handleOpen();
 
-    if (trimmedQuery.length >= 3) {
-      syncUrl(trimmedQuery);
-    } else {
-      syncUrl("");
+    if (!trimmedQuery) {
+      if (!isRedirectMode) {
+        syncUrl("");
+      }
+      return;
     }
 
-    inputRef.current?.blur();
+    if (trimmedQuery.length >= SEARCH_MIN_QUERY) {
+      if (isRedirectMode) {
+        navigateToSearchPage(trimmedQuery);
+      } else {
+        syncUrl(trimmedQuery);
+      }
+      inputRef.current?.blur();
+    } else {
+      if (!isRedirectMode) {
+        syncUrl("");
+      }
+    }
   };
 
   useEffect(() => {
-    if (isOpen) {
+    if (!isPageMode && isOpen) {
       inputRef.current?.focus();
       document.body.style.overflow = "hidden";
     } else {
@@ -158,40 +203,42 @@ export default function SearchBar({ inline = true }: SearchBarProps) {
     return () => {
       window.removeEventListener("keydown", handleKey);
     };
-  }, [searchParams]);
+  }, [searchParams, isRedirectMode]);
 
   useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
-      setDebouncedQuery(query);
-    }, 300);
+    if (isRedirectMode) {
+      return;
+    }
 
-    return () => window.clearTimeout(timeoutId);
-  }, [query]);
-
-  useEffect(() => {
-    if (debouncedQuery.trim().length >= 3) {
+    if (debouncedQuery.trim().length >= SEARCH_MIN_QUERY) {
       syncUrl(debouncedQuery);
       return;
     }
 
-    if (!debouncedQuery.trim()) {
+    if (debouncedQuery.trim().length === 0 || debouncedQuery.trim().length < SEARCH_MIN_QUERY) {
       syncUrl("");
     }
-  }, [debouncedQuery, searchParams]);
+  }, [debouncedQuery, isRedirectMode, isPageMode]);
 
   useEffect(() => {
     if (hasSyncedUrl.current) return;
 
-    if (pathname === "/") {
-      const q = searchParams.get("q");
-      if (q) {
-        setQuery(q);
-        open();
+    if ((isInlineMode && pathname === "/") || isPageMode) {
+      if (urlQuery) {
+        setQuery(urlQuery);
+        if (isInlineMode) {
+          open();
+        } else {
+          collapse();
+        }
+      } else if (isPageMode) {
+        setQuery("");
+        collapse();
       }
     }
 
     hasSyncedUrl.current = true;
-  }, [searchParams, open, setQuery, pathname]);
+  }, [collapse, isInlineMode, isPageMode, open, pathname, setQuery, urlQuery]);
 
   useEffect(() => {
     const navElement = document.querySelector<HTMLElement>("[data-site-nav]");
@@ -229,14 +276,20 @@ export default function SearchBar({ inline = true }: SearchBarProps) {
     };
   }, []);
 
-  if (!inline && !isOpen) {
+  useEffect(() => {
+    if (isPageMode) {
+      collapse();
+    }
+  }, [collapse, isPageMode]);
+
+  if (isRedirectMode && !isOpen) {
     return null;
   }
 
   return (
     <>
       <AnimatePresence>
-        {isOpen ? (
+        {!isPageMode && isOpen ? (
           <motion.div
             key="overlay"
             className="fixed inset-0 z-40 bg-black/12 backdrop-blur-md dark:bg-black/80"
@@ -256,7 +309,7 @@ export default function SearchBar({ inline = true }: SearchBarProps) {
           handleOpen();
         }}
         onPointerDown={(event) => {
-          if (isOpen) {
+          if (isExpanded) {
             return;
           }
 
@@ -269,18 +322,20 @@ export default function SearchBar({ inline = true }: SearchBarProps) {
           handleOpen();
         }}
         className={[
-          isOpen
+          isExpanded
             ? useInlineMobileLayout
               ? "relative z-[60] mx-auto w-full max-w-2xl"
-              : "fixed inset-x-0 z-[60] w-full px-4 pb-0 sm:px-6 lg:px-8"
-            : inline
+              : isPageMode
+                ? "relative z-10 mx-auto w-full max-w-2xl"
+                : "fixed inset-x-0 z-[60] w-full px-4 pb-0 sm:px-6 lg:px-8"
+            : isInlineMode
               ? "relative z-10 mx-auto max-w-2xl cursor-pointer"
               : "hidden",
         ].join(" ")}
         style={{
           originX: 0.5,
           originY: 0,
-          top: isOpen && !useInlineMobileLayout ? `${navOffset}px` : undefined,
+          top: isOpen && !useInlineMobileLayout && !isPageMode ? `${navOffset}px` : undefined,
         }}
         transition={{
           layout: { type: "spring", stiffness: 300, damping: 30 },
@@ -297,10 +352,12 @@ export default function SearchBar({ inline = true }: SearchBarProps) {
           >
             <SearchIcon className="h-[18px] w-[18px] shrink-0 text-accent" />
             <input
+              id="search"
+              data-global-search-input="true"
               ref={inputRef}
               type="search"
               name="q"
-              value={query}
+              value={displayedQuery}
               onChange={(event) => {
                 handleOpen();
                 setQuery(event.target.value);
@@ -318,12 +375,12 @@ export default function SearchBar({ inline = true }: SearchBarProps) {
               autoCapitalize="none"
               spellCheck={false}
               enterKeyHint="search"
-              placeholder="Search for Movies, TV Shows, Songs or Artists"
+              placeholder="Search for movies, series, songs, or artists"
               className="min-w-0 flex-1 bg-transparent font-body text-base font-medium text-black placeholder:text-black/48 focus:outline-none dark:text-white dark:placeholder:text-white/42"
             />
 
             <AnimatePresence>
-              {isOpen ? (
+              {isExpanded ? (
                 <motion.button
                   key="close"
                   type="button"
@@ -346,7 +403,7 @@ export default function SearchBar({ inline = true }: SearchBarProps) {
           </div>
 
           <AnimatePresence>
-            {isOpen ? (
+            {isExpanded ? (
               <motion.div
                 key="filters"
                 initial={{ opacity: 0, y: 8 }}
@@ -387,7 +444,7 @@ export default function SearchBar({ inline = true }: SearchBarProps) {
           </AnimatePresence>
 
           <AnimatePresence>
-            {isOpen && query.trim().length > 0 ? (
+            {isInlineMode && isExpanded && query.trim().length >= SEARCH_MIN_QUERY ? (
               <motion.div
                 key="results"
                 initial={{ opacity: 0, y: 8 }}
@@ -396,7 +453,7 @@ export default function SearchBar({ inline = true }: SearchBarProps) {
                 transition={{ duration: 0.2, delay: 0.15 }}
                 className="mt-2 max-h-[70vh] w-full overflow-y-auto rounded-2xl border border-black/10 bg-[#fffdf9] pb-6 text-foreground shadow-[0_28px_80px_rgba(31,25,21,0.18)] ring-1 ring-black/5 dark:border-white/10 dark:bg-zinc-950 dark:ring-white/5"
               >
-                <SearchResults query={debouncedQuery} filters={activeFilters} />
+                <SearchResults query={query} filters={activeFilters} variant="inline" />
               </motion.div>
             ) : null}
           </AnimatePresence>

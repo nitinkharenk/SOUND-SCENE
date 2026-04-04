@@ -2,16 +2,10 @@ import Link from "next/link";
 import { CatalogBrowseControls } from "@/components/catalog-browse-controls";
 import { RouteMeta, SplitHeading } from "@/components/route-heading";
 import { buildBrowseHref, getVisiblePages, normalizeParam } from "@/lib/browse";
-import { contentItems } from "@/lib/discovery";
+import { getCatalogCards, getCatalogCardCount, getTitleFilterOptions, type SeriesEntry } from "@/lib/content-store";
+import { pluralize } from "@/lib/text";
 
 const PAGE_SIZE = 12;
-
-const seriesItems = [...contentItems]
-  .filter((item) => item.type === "series")
-  .sort(
-    (left, right) =>
-      right.year - left.year || Number(right.rating) - Number(left.rating),
-  );
 
 type SeriesPageProps = {
   searchParams: Promise<{
@@ -26,33 +20,6 @@ type SeriesPageProps = {
 
 type SeriesSort = "newest" | "oldest" | "rating" | "title";
 
-function sortSeries(items: typeof seriesItems, sort: SeriesSort) {
-  const sorted = [...items];
-
-  if (sort === "oldest") {
-    return sorted.sort(
-      (left, right) =>
-        left.year - right.year || Number(right.rating) - Number(left.rating),
-    );
-  }
-
-  if (sort === "rating") {
-    return sorted.sort(
-      (left, right) =>
-        Number(right.rating) - Number(left.rating) || right.year - left.year,
-    );
-  }
-
-  if (sort === "title") {
-    return sorted.sort((left, right) => left.title.localeCompare(right.title));
-  }
-
-  return sorted.sort(
-    (left, right) =>
-      right.year - left.year || Number(right.rating) - Number(left.rating),
-  );
-}
-
 export default async function SeriesPage({ searchParams }: SeriesPageProps) {
   const params = await searchParams;
   const query = normalizeParam(params.q).trim();
@@ -65,40 +32,33 @@ export default async function SeriesPage({ searchParams }: SeriesPageProps) {
     ? sortValue
     : "newest") as SeriesSort;
 
-  const genres = [...new Set(seriesItems.flatMap((series) => series.genres))].sort((a, b) =>
-    a.localeCompare(b),
-  );
-  const platforms = [...new Set(seriesItems.map((series) => series.meta.split(" · ").slice(1).join(" · ")))]
-    .filter(Boolean)
-    .sort((a, b) => a.localeCompare(b));
-  const years = [...new Set(seriesItems.map((series) => String(series.year)))].sort(
-    (a, b) => Number(b) - Number(a),
-  );
+  const filterParams = {
+    type: "series" as const,
+    query: query || undefined,
+    genre: genre || undefined,
+    platform: platform || undefined,
+    year: year ? Number(year) : undefined,
+  };
 
-  const filteredSeries = sortSeries(
-    seriesItems.filter((series) => {
-      const matchesQuery = query
-        ? [series.title, series.description, series.meta, series.year, ...series.genres]
-            .join(" ")
-            .toLowerCase()
-            .includes(query.toLowerCase())
-        : true;
-      const matchesGenre = genre ? series.genres.includes(genre) : true;
-      const matchesPlatform = platform ? series.meta.includes(platform) : true;
-      const matchesYear = year ? String(series.year) === year : true;
-
-      return matchesQuery && matchesGenre && matchesPlatform && matchesYear;
+  const [totalCount, filterOptions, visibleSeries] = await Promise.all([
+    getCatalogCardCount(filterParams),
+    getTitleFilterOptions("series"),
+    getCatalogCards({
+      ...filterParams,
+      limit: PAGE_SIZE,
+      skip: (Math.max(1, requestedPage) - 1) * PAGE_SIZE,
+      sort,
     }),
-    sort,
-  );
+  ]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredSeries.length / PAGE_SIZE));
+  const { genres, platforms, years } = filterOptions;
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
   const currentPage =
     Number.isFinite(requestedPage) && requestedPage > 0
       ? Math.min(requestedPage, totalPages)
       : 1;
   const pageStart = (currentPage - 1) * PAGE_SIZE;
-  const visibleSeries = filteredSeries.slice(pageStart, pageStart + PAGE_SIZE);
   const visiblePages = getVisiblePages(currentPage, totalPages);
 
   return (
@@ -113,7 +73,7 @@ export default async function SeriesPage({ searchParams }: SeriesPageProps) {
           />
           <RouteMeta
             items={[
-              `${filteredSeries.length} entries`,
+              pluralize(totalCount, "entry"),
               `Page ${currentPage} of ${totalPages}`,
               "Episode mapped",
             ]}
@@ -139,27 +99,41 @@ export default async function SeriesPage({ searchParams }: SeriesPageProps) {
       </section>
 
       {visibleSeries.length > 0 ? (
-        <section className="mt-12 grid gap-8 md:grid-cols-2 xl:grid-cols-3">
-          {visibleSeries.map((series) => (
-            <Link key={series.slug} href={series.href} className="hover-card group block">
-              <div className="aspect-[1.18/0.74] overflow-hidden rounded-[0.4rem] bg-[#ede5da]">
+        <section className="mt-12 route-surface">
+          {visibleSeries.map((series, index) => (
+            <Link
+              key={series.slug}
+              href={`/series/${series.slug}`}
+              className="route-row-link sm:grid-cols-[72px_180px_1fr]"
+            >
+              <div className="font-heading text-4xl font-bold leading-none tracking-tight text-black/22">
+                {String(pageStart + index + 1).padStart(2, "0")}
+              </div>
+              <div className="aspect-[1.08/0.86] overflow-hidden rounded-[0.42rem] bg-[#ede5da]">
                 <img
                   src={series.poster}
                   alt={series.title}
                   className="hover-card-media h-full w-full object-cover"
                 />
               </div>
-              <div className="pt-5">
-                <span className="route-tag">{series.genres[0] ?? series.label}</span>
-                <h2 className="hover-card-title card-heading mt-3 text-2xl font-semibold leading-tight text-black">
+              <div className="flex min-h-full flex-col">
+                <p className="route-kicker text-[0.72rem]">
+                  {series.genres[0] ?? "Series"} · {series.year}
+                </p>
+                <h2 className="card-heading clamp-2 mt-2 min-h-[3.4rem] text-2xl font-semibold leading-tight text-black">
                   {series.title}
                 </h2>
-                <p className="mt-2 font-body text-sm font-normal text-black/58">
-                  {series.year} · {series.meta}
+                <p className="clamp-1 mt-2 font-body text-sm font-normal text-black/58">
+                  {series.type === "series" && series.seasonsCount ? `${pluralize(series.seasonsCount, "season")} · ` : ""}{series.platform}
                 </p>
-                <p className="mt-3 font-body text-base font-normal leading-relaxed text-black/64">
+                <p className="clamp-2 mt-3 min-h-[3.15rem] font-body text-base font-normal leading-relaxed text-black/64">
                   {series.description}
                 </p>
+                {series.type === "series" && series.seasonsCount ? (
+                  <p className="mt-auto pt-3 font-body text-sm font-normal text-black/58">
+                    {pluralize(series.seasonsCount, "season")} mapped across the soundtrack guide.
+                  </p>
+                ) : null}
               </div>
             </Link>
           ))}
@@ -171,14 +145,19 @@ export default async function SeriesPage({ searchParams }: SeriesPageProps) {
             No series matched the current search and filter combination. Try another genre,
             platform, year, or keyword.
           </p>
+          <div className="mt-5">
+            <Link href="/series" className="route-action route-action-primary">
+              Clear all series filters
+            </Link>
+          </div>
         </section>
       )}
 
-      {filteredSeries.length > PAGE_SIZE ? (
+      {totalCount > PAGE_SIZE ? (
         <section className="mt-12 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="font-body text-sm font-normal text-[color:var(--muted)]">
-            Showing {pageStart + 1}-{Math.min(pageStart + PAGE_SIZE, filteredSeries.length)} of{" "}
-            {filteredSeries.length} series
+            Showing {pageStart + 1}-{Math.min(pageStart + PAGE_SIZE, totalCount)} of{" "}
+            {pluralize(totalCount, "series", "series")}
           </p>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -201,26 +180,32 @@ export default async function SeriesPage({ searchParams }: SeriesPageProps) {
               Previous
             </Link>
 
-            {visiblePages.map((page) => (
-              <Link
-                key={page}
-                href={buildBrowseHref(
-                  "/series",
-                  {
-                    q: query,
-                    genre,
-                    platform,
-                    year,
-                    sort,
-                    page,
-                  },
-                  { defaultSort: "newest" },
-                )}
-                className={page === currentPage ? "route-action route-action-primary" : "route-action"}
-              >
-                {page}
-              </Link>
-            ))}
+            {visiblePages.map((page, index) =>
+              page === "..." ? (
+                <span key={`ellipsis-${index}`} className="px-2 font-body text-sm text-[color:var(--muted)]">
+                  ...
+                </span>
+              ) : (
+                <Link
+                  key={page}
+                  href={buildBrowseHref(
+                    "/series",
+                    {
+                      q: query,
+                      genre,
+                      platform,
+                      year,
+                      sort,
+                      page,
+                    },
+                    { defaultSort: "newest" },
+                  )}
+                  className={page === currentPage ? "route-action route-action-primary" : "route-action"}
+                >
+                  {page}
+                </Link>
+              ),
+            )}
 
             <Link
               href={buildBrowseHref(

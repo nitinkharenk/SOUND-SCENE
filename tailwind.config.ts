@@ -19,9 +19,9 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans: ["var(--font-inter)", "system-ui", "sans-serif"],
-        display: ["var(--font-syne)", "sans-serif"],
-        ui: ["var(--font-cabinet-grotesk)", "sans-serif"],
+        sans: ["var(--font-body)", "system-ui", "sans-serif"],
+        display: ["var(--font-heading)", "sans-serif"],
+        ui: ["var(--font-body)", "sans-serif"],
         heading: ["var(--font-heading)"],
         card: ["var(--font-card)"],
         body: ["var(--font-body)"],

@@ -6,10 +6,34 @@ export function normalizeParam(value?: string | string[]): string {
   return value ?? "";
 }
 
-export function getVisiblePages(currentPage: number, totalPages: number): number[] {
-  const pages = new Set<number>([1, totalPages, currentPage - 1, currentPage, currentPage + 1]);
+export type VisiblePageToken = number | "...";
 
-  return [...pages].filter((page) => page >= 1 && page <= totalPages).sort((a, b) => a - b);
+export function getVisiblePages(
+  currentPage: number,
+  totalPages: number,
+): VisiblePageToken[] {
+  const pages = new Set<number>();
+
+  for (const page of [1, 2, 3, currentPage - 1, currentPage, currentPage + 1, totalPages - 2, totalPages - 1, totalPages]) {
+    if (page >= 1 && page <= totalPages) {
+      pages.add(page);
+    }
+  }
+
+  const sortedPages = [...pages].sort((left, right) => left - right);
+  const visiblePages: VisiblePageToken[] = [];
+
+  sortedPages.forEach((page, index) => {
+    const previousPage = sortedPages[index - 1];
+
+    if (typeof previousPage === "number" && page - previousPage > 1) {
+      visiblePages.push("...");
+    }
+
+    visiblePages.push(page);
+  });
+
+  return visiblePages;
 }
 
 export function buildBrowseHref(

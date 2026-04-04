@@ -1,0 +1,127 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  schemas  = ["public", "auth"]
+}
+
+enum TitleType {
+  movie
+  series
+
+  @@schema("public")
+}
+
+model Title {
+  id          String           @id @default(cuid())
+  slug        String           @unique
+  title       String
+  type        TitleType
+  year        Int
+  rating      String
+  runtime     String?
+  platform    String
+  tagline     String
+  description String
+  poster      String
+  backdrop    String
+  source      String?
+  tmdbId      Int?             @unique
+  tvmazeId    Int?             @unique
+  genres      TitleGenre[]
+  seasons     Season[]
+  appearances SongAppearance[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([type, year])
+  @@index([slug])
+  @@schema("public")
+}
+
+model Genre {
+  id     String      @id @default(cuid())
+  name   String      @unique
+  titles TitleGenre[]
+
+  @@schema("public")
+}
+
+model TitleGenre {
+  titleId String
+  genreId String
+  title   Title @relation(fields: [titleId], references: [id], onDelete: Cascade)
+  genre   Genre @relation(fields: [genreId], references: [id], onDelete: Cascade)
+
+  @@id([titleId, genreId])
+  @@index([genreId])
+  @@schema("public")
+}
+
+model Season {
+  id           String    @id @default(cuid())
+  titleId      String
+  title        Title     @relation(fields: [titleId], references: [id], onDelete: Cascade)
+  seasonNumber Int
+  label        String?
+  episodes     Episode[]
+
+  @@unique([titleId, seasonNumber])
+  @@schema("public")
+}
+
+model Episode {
+  id            String           @id @default(cuid())
+  seasonId       String
+  season         Season           @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  episodeNumber  Int
+  title          String
+  summary        String
+  appearances    SongAppearance[]
+
+  @@unique([seasonId, episodeNumber])
+  @@schema("public")
+}
+
+model Song {
+  id            String           @id @default(cuid())
+  slug          String           @unique
+  title         String
+  artist        String
+  mood          String
+  artwork       String?
+  album         String?
+  youtubeLink   String
+  spotifyLink   String
+  musicBrainzId String?          @unique
+  source        String?
+  appearances   SongAppearance[]
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@index([title])
+  @@index([artist])
+  @@schema("public")
+}
+
+model SongAppearance {
+  id               String   @id @default(cuid())
+  titleId          String
+  songId           String
+  episodeId        String?
+  order            Int
+  sceneType        String
+  timestamp        String?
+  sceneDescription String
+  source           String?
+  title            Title    @relation(fields: [titleId], references: [id], onDelete: Cascade)
+  song             Song     @relation(fields: [songId], references: [id], onDelete: Cascade)
+  episode          Episode? @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+
+  @@index([titleId, order])
+  @@index([songId])
+  @@index([episodeId])
+  @@schema("public")
+}

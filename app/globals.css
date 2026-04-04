@@ -1,17 +1,17 @@
-@import url("https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Inter:wght@400;500;600&display=swap");
-@import url("https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@500,600&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&display=swap");
+@import url("https://fonts.cdnfonts.com/css/monument-extended");
 @config "../tailwind.config.ts";
 @import "tailwindcss";
 
-@variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+@variant dark (&:where([data-mode="dark"], [data-mode="dark"] *));
 
 :root {
-  --font-heading: "Syne", sans-serif;
-  --font-card: "Cabinet Grotesk", sans-serif;
-  --font-body: "Inter", sans-serif;
-  --font-inter: "Inter", sans-serif;
-  --font-syne: "Syne", sans-serif;
-  --font-cabinet-grotesk: "Cabinet Grotesk", sans-serif;
+  --font-heading: "Monument Extended", sans-serif;
+  --font-card: "Sora", sans-serif;
+  --font-body: "Sora", sans-serif;
+  --font-inter: "Sora", sans-serif;
+  --font-syne: "Monument Extended", sans-serif;
+  --font-cabinet-grotesk: "Sora", sans-serif;
   --background: #F5F3EE;
   --foreground: #1f1915;
   --card: #ffffff;
@@ -33,15 +33,20 @@
   --accent-blue: #334b7d;
   --accent-green: #3d6b59;
   --accent-berry: #7b325c;
+  --nav-background: #F5F3EE;
+  --nav-foreground: #1f1915;
+  --nav-muted: #6B6965;
+  --nav-border: #E8E6E1;
+  --nav-surface: #FFFFFF;
 }
 
-[data-theme="dark"] {
-  --font-heading: "Syne", sans-serif;
-  --font-card: "Cabinet Grotesk", sans-serif;
-  --font-body: "Inter", sans-serif;
-  --font-inter: "Inter", sans-serif;
-  --font-syne: "Syne", sans-serif;
-  --font-cabinet-grotesk: "Cabinet Grotesk", sans-serif;
+[data-mode="dark"] {
+  --font-heading: "Monument Extended", sans-serif;
+  --font-card: "Sora", sans-serif;
+  --font-body: "Sora", sans-serif;
+  --font-inter: "Sora", sans-serif;
+  --font-syne: "Monument Extended", sans-serif;
+  --font-cabinet-grotesk: "Sora", sans-serif;
   --background: #111010;
   --foreground: #f5f5f5;
   --card: #1A1918;
@@ -75,7 +80,11 @@ body {
   overflow-x: clip;
   background: var(--background);
   color: var(--foreground);
-  letter-spacing: -0.01em;
+  font-size: 16px;
+  letter-spacing: 0.01em;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   transition: background-color 180ms ease, color 180ms ease;
 }
 
@@ -98,22 +107,29 @@ img {
 
 h1,
 h2 {
-  @apply font-heading tracking-tight;
+  @apply font-heading font-extrabold;
+  letter-spacing: 0.01em;
+  line-height: 1.25;
 }
 
-h3,
+h3 {
+  @apply font-card font-bold;
+  letter-spacing: -0.015em;
+  line-height: 1.2;
+}
+
 h4,
 h5,
 h6 {
-  @apply font-card;
-  letter-spacing: -0.03em;
-  line-height: 1.08;
+  @apply font-card font-semibold;
+  letter-spacing: -0.015em;
+  line-height: 1.2;
 }
 
 .card-heading {
   @apply font-card;
-  letter-spacing: -0.03em;
-  line-height: 1.08;
+  letter-spacing: -0.015em;
+  line-height: 1.2;
 }
 
 .grid-lines {
@@ -134,38 +150,41 @@ h6 {
 }
 
 .section-banner-heading {
-  @apply font-heading text-4xl font-bold tracking-tight;
-  line-height: 0.94;
+  @apply font-heading text-3xl font-extrabold;
+  letter-spacing: -0.01em;
+  line-height: 1.05;
   text-transform: uppercase;
 }
 
 @media (min-width: 640px) {
   .section-banner-heading {
-    font-size: 2.75rem;
+    font-size: 2.25rem;
   }
 }
 
 @media (min-width: 1024px) {
   .section-banner-heading {
-    font-size: 3rem;
+    font-size: 2.5rem;
   }
 }
 
 @media (min-width: 1280px) {
   .section-banner-heading {
-    font-size: 3.25rem;
+    font-size: 2.75rem;
   }
 }
 
 .section-outline-word {
   color: transparent !important;
   -webkit-text-fill-color: transparent;
-  -webkit-text-stroke-width: 2.3px;
+  -webkit-text-stroke-width: 1.8px;
   -webkit-text-stroke-color: var(--outlined-stroke);
 }
 
 .body-copy {
-  @apply font-body text-base font-normal leading-relaxed;
+  @apply font-body text-[0.94rem] font-normal;
+  line-height: 1.7;
+  letter-spacing: 0.005em;
   color: var(--muted);
 }
 
@@ -204,13 +223,15 @@ h6 {
 }
 
 .route-kicker {
-  @apply font-body text-xs font-medium uppercase tracking-wide;
-  text-transform: uppercase;
+  @apply font-body text-[0.7rem] font-semibold uppercase;
+  letter-spacing: 0.14em;
   color: var(--color-accent);
 }
 
 .route-description {
-  @apply font-body text-base font-normal leading-relaxed;
+  @apply font-body text-[0.94rem] font-normal;
+  line-height: 1.7;
+  letter-spacing: 0.005em;
   color: var(--muted);
 }
 
@@ -233,7 +254,7 @@ h6 {
 }
 
 .route-tag {
-  @apply font-body text-xs font-medium uppercase tracking-wide;
+  @apply font-body text-[0.7rem] font-medium uppercase tracking-[0.1em];
   display: inline-flex;
   align-items: center;
   border: 1px solid var(--color-border);
@@ -291,6 +312,27 @@ h6 {
   color: var(--color-accent-hover);
 }
 
+.clamp-1 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clamp-2,
+.clamp-3 {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+}
+
+.clamp-2 {
+  -webkit-line-clamp: 2;
+}
+
+.clamp-3 {
+  -webkit-line-clamp: 3;
+}
+
 .route-divider {
   border-top: 1px solid var(--line);
 }
@@ -341,7 +383,9 @@ h6 {
   border: 1px solid transparent;
   border-radius: 0.72rem;
   padding-inline: 0.7rem;
+  padding-block: 1.35rem;
   margin-inline: -0.7rem;
+  margin-block: 0.35rem;
   transition:
     transform 180ms ease,
     background-color 180ms ease;
@@ -350,7 +394,9 @@ h6 {
 @media (max-width: 639px) {
   .soundtrack-row {
     padding-inline: 0.45rem;
+    padding-block: 1.1rem;
     margin-inline: -0.45rem;
+    margin-block: 0.3rem;
   }
 }
 
@@ -395,9 +441,9 @@ h6 {
   align-items: center;
   gap: 0.65rem;
   font-family: var(--font-body);
-  font-size: 0.72rem;
-  font-weight: 500;
-  letter-spacing: 0.16em;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: color-mix(in srgb, var(--foreground) 46%, transparent);
 }
@@ -425,8 +471,9 @@ h6 {
   border-left: 2px solid var(--color-accent);
   padding-left: 0.7rem;
   font-family: var(--font-body);
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: 500;
+  line-height: 1.5;
   color: color-mix(in srgb, var(--foreground) 72%, transparent);
 }
 
@@ -444,23 +491,23 @@ h6 {
 }
 
 .route-action {
-  @apply font-body text-sm font-medium;
+  @apply font-body text-[0.8rem] font-semibold;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border: 1px solid var(--line);
   border-radius: 999px;
-  padding: 0.55rem 1rem;
-  letter-spacing: 0.15em;
+  padding: 0.6rem 1.15rem;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   transition: border-color 160ms ease, color 160ms ease, background-color 160ms ease;
 }
 
 @media (max-width: 639px) {
   .route-action {
-    padding: 0.5rem 0.85rem;
-    font-size: 0.78rem;
-    letter-spacing: 0.12em;
+    padding: 0.5rem 0.9rem;
+    font-size: 0.75rem;
+    letter-spacing: 0.06em;
   }
 }
 
@@ -554,31 +601,31 @@ h6 {
   caret-color: var(--color-accent);
 }
 
-html[data-theme="dark"] .strip-image {
+html[data-mode="dark"] .strip-image {
   background: #1A1918;
 }
 
-html[data-theme="dark"] .route-thumb {
+html[data-mode="dark"] .route-thumb {
   background: #1A1918;
 }
 
-html[data-theme="dark"] .hero-stage {
+html[data-mode="dark"] .hero-stage {
   background: transparent;
 }
 
-html[data-theme="dark"] [class*="text-black"] {
+html[data-mode="dark"] [class*="text-black"] {
   color: #f5f5f5 !important;
 }
 
-html[data-theme="dark"] [class*="border-black"] {
+html[data-mode="dark"] [class*="border-black"] {
   border-color: #2E2D2B !important;
 }
 
-html[data-theme="dark"] [class*="bg-white"] {
+html[data-mode="dark"] [class*="bg-white"] {
   background-color: #1A1918 !important;
 }
 
-html[data-theme="dark"] .focus-ring:focus-visible {
+html[data-mode="dark"] .focus-ring:focus-visible {
   outline-color: rgba(255, 255, 255, 0.28);
 }
 
