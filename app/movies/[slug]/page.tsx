@@ -13,7 +13,11 @@ type MovieDetailPageProps = {
 };
 
 export async function generateStaticParams() {
-  return getStaticMovieParams();
+  try {
+    return await getStaticMovieParams();
+  } catch {
+    return [];
+  }
 }
 
 export default async function MovieDetailPage({ params }: MovieDetailPageProps) {

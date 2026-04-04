@@ -11,8 +11,12 @@ type DiscoverGenrePageProps = {
 };
 
 export async function generateStaticParams() {
-  const genres = await getDiscoverGenreSlugs();
-  return genres.map((genre) => ({ genre }));
+  try {
+    const genres = await getDiscoverGenreSlugs();
+    return genres.map((genre: string) => ({ genre }));
+  } catch {
+    return [];
+  }
 }
 
 export default async function DiscoverGenrePage({ params }: DiscoverGenrePageProps) {

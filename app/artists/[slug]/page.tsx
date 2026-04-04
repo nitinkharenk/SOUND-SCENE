@@ -11,8 +11,12 @@ type ArtistPageProps = {
 };
 
 export async function generateStaticParams() {
-  const artists = await getArtistProfiles();
-  return artists.map((artist) => ({ slug: artist.slug }));
+  try {
+    const artists = await getArtistProfiles();
+    return artists.map((artist) => ({ slug: artist.slug }));
+  } catch {
+    return [];
+  }
 }
 
 export default async function ArtistPage({ params }: ArtistPageProps) {

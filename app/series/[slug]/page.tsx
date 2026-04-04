@@ -13,7 +13,11 @@ type SeriesDetailPageProps = {
 };
 
 export async function generateStaticParams() {
-  return getStaticSeriesParams();
+  try {
+    return await getStaticSeriesParams();
+  } catch {
+    return [];
+  }
 }
 
 export default async function SeriesDetailPage({

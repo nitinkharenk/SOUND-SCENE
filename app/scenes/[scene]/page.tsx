@@ -11,8 +11,12 @@ type ScenePageProps = {
 };
 
 export async function generateStaticParams() {
-  const scenes = await getSceneCollectionSlugs();
-  return scenes.map((scene) => ({ scene }));
+  try {
+    const scenes = await getSceneCollectionSlugs();
+    return scenes.map((scene: string) => ({ scene }));
+  } catch {
+    return [];
+  }
 }
 
 export default async function ScenePage({ params }: ScenePageProps) {

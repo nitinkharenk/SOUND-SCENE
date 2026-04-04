@@ -16,7 +16,11 @@ type SongDetailPageProps = {
 };
 
 export async function generateStaticParams() {
-  return getStaticSongParams();
+  try {
+    return await getStaticSongParams();
+  } catch {
+    return [];
+  }
 }
 
 export default async function SongDetailPage({ params }: SongDetailPageProps) {
