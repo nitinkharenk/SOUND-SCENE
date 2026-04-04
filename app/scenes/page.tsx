@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import Link from "next/link";
 import { RouteMeta, SplitHeading } from "@/components/route-heading";
 import { getSceneCollectionData, getSceneCollectionSlugs } from "@/lib/feature-data";

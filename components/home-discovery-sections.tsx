@@ -1,8 +1,18 @@
 import { getHomeDiscoveryData } from "@/lib/discovery";
 import { HomeDiscoverySectionsClient } from "@/components/home-discovery-sections-client";
 
-export async function HomeDiscoverySections() {
-  const data = await getHomeDiscoveryData();
+const emptyData = {
+  popularCollections: { movies: [], series: [], songs: [] },
+  latestCollections: { movies: [], series: [], songs: [] },
+  trendingStories: [],
+  weeklyEpisodes: [],
+} as Awaited<ReturnType<typeof getHomeDiscoveryData>>;
 
-  return <HomeDiscoverySectionsClient {...data} />;
+export async function HomeDiscoverySections() {
+  try {
+    const data = await getHomeDiscoveryData();
+    return <HomeDiscoverySectionsClient {...data} />;
+  } catch {
+    return <HomeDiscoverySectionsClient {...emptyData} />;
+  }
 }
