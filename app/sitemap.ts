@@ -70,17 +70,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.7,
       lastModified: new Date(),
     },
-    ...titles.map((title) => ({
+    ...titles.map((title: { slug: string; type: string; updatedAt: Date }) => ({
       url: `${siteUrl}/${title.type === "movie" ? "movies" : "series"}/${title.slug}`,
       lastModified: title.updatedAt,
       priority: 0.8,
     })),
-    ...songs.map((song) => ({
+    ...songs.map((song: { slug: string; updatedAt: Date }) => ({
       url: `${siteUrl}/songs/${song.slug}`,
       lastModified: song.updatedAt,
       priority: 0.75,
     })),
-    ...artists.map((artist) => ({
+    ...artists.map((artist: { slug: string }) => ({
       url: `${siteUrl}/artists/${artist.slug}`,
       lastModified: new Date(),
       priority: 0.7,
